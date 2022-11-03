@@ -8,10 +8,10 @@ An authentication and authorization service powered by **NestJS** and **Amazon D
 POST /auth/signup
 
 ##### Request Body
-| Field | Description | Required |
+| Field | Description |
 | ------------ | ------------ |
-| email | A valid email that doesn't exist in the database | True |
-| password | A strong password (at least 8 characters, containing at least one uppercase, one lowercase, and one digit) | True |
+| email | A valid email that doesn't exist in the database |
+| password | A strong password (at least 8 characters, containing at least one uppercase, one lowercase, and one digit) |
 
 ##### Response
 | Code  | Description  |
@@ -37,10 +37,10 @@ Authenticate a user and return a pair of JWT access token and refresh token.
 POST /auth/signin
 
 ##### Request Body
-| Field | Description | Required |
+| Field | Description |
 | ------------ | ------------ |
-| email | User email address | True |
-| password | User password | True |
+| email | User email address |
+| password | User password |
 
 ##### Response
 | Code  | Description  |
@@ -66,9 +66,9 @@ curl
 POST /auth/signout
 
 ##### Request Header
-| Field | Description | Required |
+| Field | Description |
 | ------------ | ------------ |
-| Authorization | Valid JWT Access Token | True |
+| Authorization | Valid JWT Access Token |
 
 ##### Response
 | Code  | Description  |
@@ -92,9 +92,9 @@ Authorize a user, return an user object.
 POST /auth/authorize
 
 ##### Request Header
-| Field | Description | Required |
+| Field | Description |
 | ------------ | ------------ |
-| Authorization | Valid JWT Access Token | True |
+| Authorization | Valid JWT Access Token |
 
 ##### Response
 | Code  | Description  |
@@ -118,9 +118,9 @@ Refresh an access token by providing a valid refresh token. Return a pair of new
 POST /auth/refresh
 
 ##### Request Header
-| Field | Description | Required |
+| Field | Description |
 | ------------ | ------------ |
-| Authorization | Valid JWT Refresh Token | True |
+| Authorization | Valid JWT Refresh Token |
 
 ##### Response
 | Code  | Description  |
