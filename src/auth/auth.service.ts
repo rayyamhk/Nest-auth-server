@@ -7,8 +7,7 @@ const pbkdf2Async = promisify(pbkdf2);
 
 @Injectable()
 export class AuthService {
-  private readonly EMAIL_REGEX =
-    /^[a-z0-9!#$%&'*+-/=?^_`{|}~]+(?:\.[a-z0-9!#$%&'*+-/=?^_`{|}~])*@[a-z0-9][-a-z0-9]*(?:\.[-a-z0-9]+)*\.[-a-z0-9]*[a-z0-9]$/i;
+  private readonly EMAIL_REGEX = /^[a-z0-9!#$%&'*+-/=?^_`{|}~]+(?:\.[a-z0-9!#$%&'*+-/=?^_`{|}~])*@[a-z0-9][-a-z0-9]*(?:\.[-a-z0-9]+)*\.[-a-z0-9]*[a-z0-9]$/i;
   private readonly STRONG_PASSWORD_REGEX = /(?=.*[a-z])(?=.*[A-Z])(?=.*[0-9])/;
   private readonly ENCODING = 'base64';
   private readonly SALT_BYTE = 16;
@@ -55,7 +54,7 @@ export class AuthService {
     }
   }
 
-  async hash(plaintext: string, salt: string): Promise<string> {
+  async hash(plaintext: string, salt: string) {
     try {
       const hashed = await pbkdf2Async(
         plaintext,
@@ -67,6 +66,7 @@ export class AuthService {
       const stringified = hashed.toString(this.ENCODING);
       return stringified;
     } catch (err) {
+      console.error('AuthService: hash', err);
       throw err;
     }
   }

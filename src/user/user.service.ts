@@ -7,13 +7,7 @@ export class UserService {
   constructor(private databaseService: DatabaseService) {}
 
   async getUserByEmail(email: string) {
-    try {
-      const user = await this.databaseService.getUser(email);
-      return user;
-    } catch (err) {
-      console.error(err);
-      return null;
-    }
+    return await this.databaseService.getUser(email);
   }
 
   async createUser(user: User) {

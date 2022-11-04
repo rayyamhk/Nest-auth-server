@@ -1,5 +1,4 @@
-import { Body, Controller, Headers, Post, Res } from '@nestjs/common';
-import { Response } from 'express';
+import { Body, Controller, Headers, HttpException, HttpStatus, Post } from '@nestjs/common';
 import { JWTService } from '../jwt/jwt.service';
 import { UserService } from '../user/user.service';
 import { AuthService } from './auth.service';
@@ -8,12 +7,6 @@ import { CreateUserDTO, SignInUserDTO } from './dto/user';
 
 @Controller('auth')
 export class AuthController {
-  private readonly JWT_ERROR_LIST = [
-    'TokenExpiredError',
-    'JsonWebTokenError',
-    'NotBeforeError',
-  ];
-
   constructor(
     private jwtService: JWTService,
     private authService: AuthService,
@@ -21,231 +14,125 @@ export class AuthController {
   ) {}
 
   @Post('signup')
-  async signUp(@Body() createUserDTO: CreateUserDTO, @Res() res: Response) {
+  async signUp(@Body() createUserDTO: CreateUserDTO) {
     const { email, password } = createUserDTO;
 
     if (!email || !password) {
-      return res.status(400).json({
-        status: 'fail',
-        message: 'Email and password are required.',
-      });
+      throw new HttpException('Email and password are required.', HttpStatus.BAD_REQUEST);
     }
 
     if (!this.authService.isValidEmail(email)) {
-      return res.status(400).json({
-        status: 'fail',
-        message: 'Invalid email format.',
-      });
+      throw new HttpException('Invalid email format', HttpStatus.BAD_REQUEST);
     }
 
     if (!this.authService.isValidPassword(password)) {
-      return res.status(400).json({
-        status: 'fail',
-        message: 'Invalid password.',
-      });
+      throw new HttpException('Invalid password.', HttpStatus.BAD_REQUEST);
     }
 
-    try {
-      const user = await this.userService.getUserByEmail(email);
-      if (user) {
-        return res.status(400).json({
-          status: 'fail',
-          message: `User with email ${email} already exists.`,
-        });
-      }
-
-      const userObj = await this.authService.createUserObj(email, password);
-      await this.userService.createUser(userObj);
-      res.status(201).json({
-        status: 'success',
-      });
-    } catch (err) {
-      console.error(err);
-      res.status(500).json({
-        status: 'error',
-        message: 'Internal Server Error',
-      });
+    const user = await this.userService.getUserByEmail(email);
+    if (user) {
+      throw new HttpException(`User with email ${email} already exists.`, HttpStatus.BAD_REQUEST);
     }
+
+    const userObj = await this.authService.createUserObj(email, password);
+    await this.userService.createUser(userObj);
+    return {
+      statusCode: 200,
+    };
   }
 
   @Post('signin')
-  async signIn(@Body() signInUserDTO: SignInUserDTO, @Res() res: Response) {
+  async signIn(@Body() signInUserDTO: SignInUserDTO) {
     const { email, password } = signInUserDTO;
 
     if (!email || !password) {
-      return res.status(400).json({
-        status: 'fail',
-        message: 'Email and password are required.',
-      });
+      throw new HttpException('Email and password are required.', HttpStatus.BAD_REQUEST);
     }
 
-    try {
-      const user = await this.userService.getUserByEmail(email);
-      if (!user) {
-        return res.status(401).json({
-          status: 'fail',
-          message: 'Incorrect email or password.',
-        });
-      }
-
-      const hashedPassword = await this.authService.hash(password, user.salt);
-      if (hashedPassword !== user.hashedPassword) {
-        return res.status(401).json({
-          status: 'fail',
-          message: 'Incorrect email or password.',
-        });
-      }
-
-      const publicUser = this.userService.getPublicUser(user);
-      const jwtTokens = this.jwtService.generateTokens(publicUser);
-      const hashedRefreshToken = await this.authService.hash(
-        jwtTokens.refreshToken,
-        user.salt,
-      );
-
-      await this.userService.updateUserByEmail(user.email, { hashedRefreshToken });
-
-      res.status(200).json({
-        status: 'success',
-        data: {
-          accessToken: jwtTokens.accessToken,
-          refreshToken: jwtTokens.refreshToken,
-        },
-      });
-    } catch (err) {
-      console.error(err);
-      res.status(500).json({
-        status: 'error',
-        message: 'Internal Server Error',
-      });
+    const user = await this.userService.getUserByEmail(email);
+    if (!user) {
+      throw new HttpException('Incorrect email or password.', HttpStatus.UNAUTHORIZED);
     }
+
+    const hashedPassword = await this.authService.hash(password, user.salt);
+    if (hashedPassword !== user.hashedPassword) {
+      throw new HttpException('Incorrect email or password.', HttpStatus.UNAUTHORIZED);
+    }
+
+    const publicUser = this.userService.getPublicUser(user);
+    const jwtTokens = this.jwtService.generateTokens(publicUser);
+    const hashedRefreshToken = await this.authService.hash(jwtTokens.refreshToken, user.salt);
+    await this.userService.updateUserByEmail(user.email, { hashedRefreshToken });
+    return {
+      statusCode: 200,
+      data: {
+        accessToken: jwtTokens.accessToken,
+        refreshToken: jwtTokens.refreshToken,
+      },
+    };
   }
 
   @Post('signout')
-  async signOut(@Headers('authorization') authHeader: string, @Res() res: Response) {
+  async signOut(@Headers('authorization') authHeader: string) {
     const accessToken: string = this.jwtService.getTokenFromAuthHeader(authHeader);
     if (!accessToken) {
-      return res.status(400).json({
-        status: 'fail',
-        message: 'Invalid Authorization header.',
-      });
+      throw new HttpException('Invalid authorization header.', HttpStatus.BAD_REQUEST);
     }
 
-    try {
-      const tokenPayload = this.jwtService.verifyAccessToken(accessToken) as PublicUser;
-      const user = await this.userService.getUserByEmail(tokenPayload.email);
-      await this.userService.updateUserByEmail(user.email, {
-        hashedRefreshToken: null,
-      });
-      res.status(200).json({
-        status: 'success',
-      });
-    } catch (err) {
-      if (this.JWT_ERROR_LIST.includes(err.name)) {
-        return res.status(400).json({
-          status: 'fail',
-          message: err.message,
-        });
-      }
-      console.error(err);
-      res.status(500).json({
-        status: 'error',
-        message: 'Internal Server Error',
-      });
-    }
+    const tokenPayload = this.jwtService.verifyAccessToken(accessToken) as PublicUser;
+    const user = await this.userService.getUserByEmail(tokenPayload.email);
+    await this.userService.updateUserByEmail(user.email, { hashedRefreshToken: null });
+    return {
+      statusCode: 200,
+    };
   }
 
   @Post('authorize')
-  authorize(@Headers('authorization') authHeader: string, @Res() res: Response) {
+  authorize(@Headers('authorization') authHeader: string) {
     const accessToken: string = this.jwtService.getTokenFromAuthHeader(authHeader);
     if (!accessToken) {
-      return res.status(403).json({
-        status: 'fail',
-        message: 'Invalid authorization header.',
-      });
+      throw new HttpException('Invalid authorization header.', HttpStatus.FORBIDDEN);
     }
 
-    try {
-      const tokenPayload = this.jwtService.verifyAccessToken(accessToken) as PublicUser;
-      res.status(200).json({
-        status: 'success',
-        data: {
-          user: tokenPayload,
-        },
-      });
-    } catch (err) {
-      if (this.JWT_ERROR_LIST.includes(err.name)) {
-        return res.status(403).json({
-          status: 'fail',
-          message: err.message,
-        });
-      }
-      console.error(err);
-      res.status(500).json({
-        status: 'error',
-        message: 'Internal Server Error',
-      });
-    }
+    const tokenPayload = this.jwtService.verifyAccessToken(accessToken) as PublicUser;
+    return {
+      statusCode: 200,
+      data: {
+        user: tokenPayload,
+      },
+    };
   }
 
   @Post('refresh')
-  async refresh(@Headers('authorization') authHeader: string, @Res() res: Response) {
+  async refresh(@Headers('authorization') authHeader: string) {
     const refreshToken: string = this.jwtService.getTokenFromAuthHeader(authHeader);
     if (!refreshToken) {
-      return res.status(400).json({
-        status: 'fail',
-        message: 'Invalid Authorization header.',
-      });
+      throw new HttpException('Invalid authorization header.', HttpStatus.BAD_REQUEST);
     }
 
-    try {
-      const tokenPayload = this.jwtService.verifyRefreshToken(refreshToken) as PublicUser;
-      const user = await this.userService.getUserByEmail(tokenPayload.email);
-      const hashedRefreshToken = await this.authService.hash(
-        refreshToken,
-        user.salt,
-      );
-      if (!user.hashedRefreshToken) {
-        return res.status(400).json({
-          status: 'fail',
-          message: 'User signed out.',
-        });
-      }
-      if (user.hashedRefreshToken !== hashedRefreshToken) {
-        return res.status(400).json({
-          status: 'fail',
-          message: 'Refresh token reused.',
-        });
-      }
+    const tokenPayload = this.jwtService.verifyRefreshToken(refreshToken) as PublicUser;
+    const user = await this.userService.getUserByEmail(tokenPayload.email);
+    const hashedRefreshToken = await this.authService.hash(refreshToken, user.salt);
 
-      const publicUser = this.userService.getPublicUser(user);
-      const jwtTokens = this.jwtService.generateTokens(publicUser);
-      const newHashedRefreshToken = await this.authService.hash(
-        jwtTokens.refreshToken,
-        user.salt,
-      );
-      await this.userService.updateUserByEmail(user.email, {
-        hashedRefreshToken: newHashedRefreshToken,
-      });
-      res.status(200).json({
-        status: 'success',
-        data: {
-          accessToken: jwtTokens.accessToken,
-          refreshToken: jwtTokens.refreshToken,
-        },
-      });
-    } catch (err) {
-      if (this.JWT_ERROR_LIST.includes(err.name)) {
-        return res.status(400).json({
-          status: 'fail',
-          message: err.message,
-        });
-      }
-      console.error(err);
-      res.status(500).json({
-        status: 'error',
-        message: 'Internal Server Error',
-      });
+    if (!user.hashedRefreshToken) {
+      throw new HttpException('User signed out.', HttpStatus.BAD_REQUEST);
     }
+
+    if (user.hashedRefreshToken !== hashedRefreshToken) {
+      throw new HttpException('Refresh token reused.', HttpStatus.BAD_REQUEST);
+    }
+
+    const publicUser = this.userService.getPublicUser(user);
+    const jwtTokens = this.jwtService.generateTokens(publicUser);
+    const newHashedRefreshToken = await this.authService.hash(jwtTokens.refreshToken, user.salt);
+    await this.userService.updateUserByEmail(user.email, { hashedRefreshToken: newHashedRefreshToken });
+
+    return {
+      statusCode: 200,
+      data: {
+        accessToken: jwtTokens.accessToken,
+        refreshToken: jwtTokens.refreshToken,
+      },
+    };
   }
 }

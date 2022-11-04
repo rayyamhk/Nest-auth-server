@@ -1,12 +1,10 @@
 import { sign, verify } from 'jsonwebtoken';
-import { Injectable } from '@nestjs/common';
+import { HttpException, HttpStatus, Injectable } from '@nestjs/common';
 
 @Injectable()
 export class JWTService {
-  private readonly ACCESS_TOKEN_EXPIRATION =
-    process.env.JWT_ACCESS_TOKEN_EXPIRATION || '10m';
-  private readonly REFRESH_TOKEN_EXPIRATION =
-    process.env.JWT_REFRESH_TOKEN_EXPIRATION || '7d';
+  private readonly ACCESS_TOKEN_EXPIRATION = process.env.JWT_ACCESS_TOKEN_EXPIRATION || '10m';
+  private readonly REFRESH_TOKEN_EXPIRATION = process.env.JWT_REFRESH_TOKEN_EXPIRATION || '7d';
 
   generateTokens(payload: string | object) {
     try {
@@ -21,16 +19,25 @@ export class JWTService {
         refreshToken,
       };
     } catch (err) {
+      console.error('[JWT Service] generateTokens: ', err);
       throw err;
     }
   }
 
   verifyAccessToken(token: string) {
-    return verify(token, process.env.JWT_ACCESS_TOKEN_KEY);
+    try {
+      return verify(token, process.env.JWT_ACCESS_TOKEN_KEY);
+    } catch (err) {
+      throw new HttpException(err.message, HttpStatus.BAD_REQUEST);
+    }
   }
 
   verifyRefreshToken(token: string) {
-    return verify(token, process.env.JWT_REFRESH_TOKEN_KEY);
+    try {
+      return verify(token, process.env.JWT_REFRESH_TOKEN_KEY);
+    } catch (err) {
+      throw new HttpException(err.message, HttpStatus.BAD_REQUEST);
+    }
   }
 
   getTokenFromAuthHeader(authHeader: string) {

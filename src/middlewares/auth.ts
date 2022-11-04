@@ -1,3 +1,4 @@
+import { HttpException, HttpStatus } from '@nestjs/common';
 import { NextFunction, Request, Response } from 'express';
 
 export function authMiddleware(
@@ -7,11 +8,7 @@ export function authMiddleware(
 ) {
   const apiKey = req.get('x-api-key');
   if (!apiKey || !process.env.API_KEY || apiKey !== process.env.API_KEY) {
-    res.status(403).json({
-      status: 'fail',
-      message: 'Unauthorized request.',
-    });
-    return;
+    throw new HttpException('Unauthorized request.', HttpStatus.FORBIDDEN);
   }
   next();
 }
