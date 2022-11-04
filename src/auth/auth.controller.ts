@@ -40,7 +40,6 @@ export class AuthController {
       statusCode: 200,
     };
   }
-
   @Post('signin')
   async signIn(@Body() signInUserDTO: SignInUserDTO) {
     const { email, password } = signInUserDTO;
