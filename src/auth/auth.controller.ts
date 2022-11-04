@@ -3,7 +3,9 @@ import { JWTService } from '../jwt/jwt.service';
 import { UserService } from '../user/user.service';
 import { AuthService } from './auth.service';
 import { PublicUser } from '../user/interface/user';
-import { CreateUserDTO, SignInUserDTO } from './dto/user';
+import { CreateUserDTO, SignInUserDTO } from './dto/user.dto';
+import { ValidateSignUpPipe } from './pipes/validateSignUp.pipe';
+import { ValidateSignInPipe } from './pipes/validateSignIn.pipe';
 
 @Controller('auth')
 export class AuthController {
@@ -14,20 +16,8 @@ export class AuthController {
   ) {}
 
   @Post('signup')
-  async signUp(@Body() createUserDTO: CreateUserDTO) {
+  async signUp(@Body(ValidateSignUpPipe) createUserDTO: CreateUserDTO) {
     const { email, password } = createUserDTO;
-
-    if (!email || !password) {
-      throw new HttpException('Email and password are required.', HttpStatus.BAD_REQUEST);
-    }
-
-    if (!this.authService.isValidEmail(email)) {
-      throw new HttpException('Invalid email format', HttpStatus.BAD_REQUEST);
-    }
-
-    if (!this.authService.isValidPassword(password)) {
-      throw new HttpException('Invalid password.', HttpStatus.BAD_REQUEST);
-    }
 
     const user = await this.userService.getUserByEmail(email);
     if (user) {
@@ -40,13 +30,10 @@ export class AuthController {
       statusCode: 200,
     };
   }
-  @Post('signin')
-  async signIn(@Body() signInUserDTO: SignInUserDTO) {
-    const { email, password } = signInUserDTO;
 
-    if (!email || !password) {
-      throw new HttpException('Email and password are required.', HttpStatus.BAD_REQUEST);
-    }
+  @Post('signin')
+  async signIn(@Body(ValidateSignInPipe) signInUserDTO: SignInUserDTO) {
+    const { email, password } = signInUserDTO;
 
     const user = await this.userService.getUserByEmail(email);
     if (!user) {
