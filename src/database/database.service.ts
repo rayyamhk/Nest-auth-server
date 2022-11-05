@@ -6,13 +6,14 @@ import {
   UpdateItemCommand,
 } from '@aws-sdk/client-dynamodb';
 import { marshall, unmarshall } from '@aws-sdk/util-dynamodb';
+import { TABLE_NAME } from '../constants';
 
 @Injectable()
 export class DatabaseService<T> {
   private readonly ddbClient: DynamoDBClient;
   private readonly REGION = process.env.REGION || 'us-east-2';
 
-  constructor(@Inject('TABLE_NAME') private readonly tableName: string) {
+  constructor(@Inject(TABLE_NAME) private readonly tableName: string) {
     this.ddbClient = new DynamoDBClient({ region: this.REGION });
   }
 
@@ -34,11 +35,10 @@ export class DatabaseService<T> {
 
   async create(item: T) {
     try {
-      const res = await this.ddbClient.send(new PutItemCommand({
+      await this.ddbClient.send(new PutItemCommand({
         TableName: this.tableName,
         Item: marshall(item),
       }));
-      return res;
     } catch (err) {
       console.error(`[Database Service] ${this.tableName} - create: `, err);
       throw err;
