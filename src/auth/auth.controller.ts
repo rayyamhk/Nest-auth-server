@@ -1,4 +1,4 @@
-import { Body, Controller, Headers, HttpException, HttpStatus, Post } from '@nestjs/common';
+import { Body, Controller, Headers, HttpException, HttpStatus, Post, UseGuards } from '@nestjs/common';
 import { JWTService } from '../jwt/jwt.service';
 import { UserService } from '../user/user.service';
 import { AuthService } from './auth.service';
@@ -6,8 +6,10 @@ import { PublicUser } from '../user/interface/user';
 import { CreateUserDTO, SignInUserDTO } from './dto/user.dto';
 import { ValidateSignUpPipe } from './pipes/validateSignUp.pipe';
 import { ValidateSignInPipe } from './pipes/validateSignIn.pipe';
+import { AuthGuard } from '../guards/auth.guard';
 
 @Controller('auth')
+@UseGuards(AuthGuard)
 export class AuthController {
   constructor(
     private jwtService: JWTService,
