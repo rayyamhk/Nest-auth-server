@@ -1,10 +1,10 @@
-import { Inject, Injectable } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import { DatabaseService } from '../database/database.service';
 import { PublicUser, User } from './interface/user';
 
 @Injectable()
 export class UserService {
-  constructor(@Inject('USERS_DATABASE_SERVICE') private readonly usersDatabaseService: DatabaseService<User>) {}
+  constructor(private readonly usersDatabaseService: DatabaseService<User>) {}
 
   async getUserByEmail(email: string) {
     return await this.usersDatabaseService.get({ email });

@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Inject, Injectable } from '@nestjs/common';
 import {
   DynamoDBClient,
   GetItemCommand,
@@ -12,7 +12,7 @@ export class DatabaseService<T> {
   private readonly ddbClient: DynamoDBClient;
   private readonly REGION = process.env.REGION || 'us-east-2';
 
-  constructor(private readonly tableName: string) {
+  constructor(@Inject('TABLE_NAME') private readonly tableName: string) {
     this.ddbClient = new DynamoDBClient({ region: this.REGION });
   }
 
