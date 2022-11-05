@@ -1,4 +1,4 @@
-import { ArgumentMetadata, HttpException, HttpStatus, Injectable, PipeTransform } from '@nestjs/common';
+import { ArgumentMetadata, BadRequestException, Injectable, PipeTransform, UnauthorizedException } from '@nestjs/common';
 import { AuthService } from '../auth.service';
 
 @Injectable()
@@ -7,17 +7,17 @@ export class ValidateSignInPipe implements PipeTransform {
 
   transform(value: any, metadata: ArgumentMetadata) {
     if (!value.email || !value.password) {
-      throw new HttpException('Email and password are required.', HttpStatus.BAD_REQUEST);
+      throw new BadRequestException('Email and password are required.');
     }
 
     const { email, password } = value;
 
     if (typeof email !== 'string' || !this.authService.isValidEmail(email)) {
-      throw new HttpException('Incorrect email or password.', HttpStatus.UNAUTHORIZED);
+      throw new UnauthorizedException('Incorrect email or password.');
     }
 
     if (typeof password !== 'string' || !this.authService.isValidPassword(password)) {
-      throw new HttpException('Incorrect email or password.', HttpStatus.UNAUTHORIZED);
+      throw new UnauthorizedException('Incorrect email or password.');
     }
 
     return {

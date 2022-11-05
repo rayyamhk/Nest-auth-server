@@ -1,4 +1,15 @@
-import { Body, Controller, Headers, HttpException, HttpStatus, Post, UseGuards } from '@nestjs/common';
+import {
+  BadRequestException,
+  Body,
+  Controller,
+  ForbiddenException,
+  Headers,
+  HttpCode,
+  HttpStatus,
+  Post,
+  UnauthorizedException,
+  UseGuards,
+} from '@nestjs/common';
 import { JWTService } from '../jwt/jwt.service';
 import { UserService } from '../user/user.service';
 import { AuthService } from './auth.service';
@@ -18,33 +29,35 @@ export class AuthController {
   ){}
 
   @Post('signup')
+  @HttpCode(HttpStatus.CREATED)
   async signUp(@Body(ValidateSignUpPipe) createUserDTO: CreateUserDTO) {
     const { email, password } = createUserDTO;
 
     const user = await this.userService.getUserByEmail(email);
     if (user) {
-      throw new HttpException(`User with email ${email} already exists.`, HttpStatus.BAD_REQUEST);
+      throw new BadRequestException(`User with email ${email} already exists.`);
     }
 
     const userObj = await this.authService.createUserObj(email, password);
     await this.userService.createUser(userObj);
     return {
-      statusCode: 200,
+      statusCode: HttpStatus.CREATED,
     };
   }
 
   @Post('signin')
+  @HttpCode(HttpStatus.OK)
   async signIn(@Body(ValidateSignInPipe) signInUserDTO: SignInUserDTO) {
     const { email, password } = signInUserDTO;
 
     const user = await this.userService.getUserByEmail(email);
     if (!user) {
-      throw new HttpException('Incorrect email or password.', HttpStatus.UNAUTHORIZED);
+      throw new UnauthorizedException('Incorrect email or password.');
     }
 
     const hashedPassword = await this.authService.hash(password, user.salt);
     if (hashedPassword !== user.hashedPassword) {
-      throw new HttpException('Incorrect email or password.', HttpStatus.UNAUTHORIZED);
+      throw new UnauthorizedException('Incorrect email or password.');
     }
 
     const publicUser = this.userService.getPublicUser(user);
@@ -52,7 +65,7 @@ export class AuthController {
     const hashedRefreshToken = await this.authService.hash(jwtTokens.refreshToken, user.salt);
     await this.userService.updateUserByEmail(user.email, { hashedRefreshToken });
     return {
-      statusCode: 200,
+      statusCode: HttpStatus.OK,
       data: {
         accessToken: jwtTokens.accessToken,
         refreshToken: jwtTokens.refreshToken,
@@ -61,30 +74,32 @@ export class AuthController {
   }
 
   @Post('signout')
+  @HttpCode(HttpStatus.ACCEPTED)
   async signOut(@Headers('authorization') authHeader: string) {
     const accessToken: string = this.jwtService.getTokenFromAuthHeader(authHeader);
     if (!accessToken) {
-      throw new HttpException('Invalid authorization header.', HttpStatus.BAD_REQUEST);
+      throw new BadRequestException('Invalid authorization header.');
     }
 
     const tokenPayload = this.jwtService.verifyAccessToken(accessToken) as PublicUser;
     const user = await this.userService.getUserByEmail(tokenPayload.email);
     await this.userService.updateUserByEmail(user.email, { hashedRefreshToken: null });
     return {
-      statusCode: 200,
+      statusCode: HttpStatus.ACCEPTED,
     };
   }
 
   @Post('authorize')
+  @HttpCode(HttpStatus.OK)
   authorize(@Headers('authorization') authHeader: string) {
     const accessToken: string = this.jwtService.getTokenFromAuthHeader(authHeader);
     if (!accessToken) {
-      throw new HttpException('Invalid authorization header.', HttpStatus.FORBIDDEN);
+      throw new ForbiddenException('Invalid authorization header.');
     }
 
     const tokenPayload = this.jwtService.verifyAccessToken(accessToken) as PublicUser;
     return {
-      statusCode: 200,
+      statusCode: HttpStatus.OK,
       data: {
         user: tokenPayload,
       },
@@ -92,10 +107,11 @@ export class AuthController {
   }
 
   @Post('refresh')
+  @HttpCode(HttpStatus.OK)
   async refresh(@Headers('authorization') authHeader: string) {
     const refreshToken: string = this.jwtService.getTokenFromAuthHeader(authHeader);
     if (!refreshToken) {
-      throw new HttpException('Invalid authorization header.', HttpStatus.BAD_REQUEST);
+      throw new BadRequestException('Invalid authorization header.');
     }
 
     const tokenPayload = this.jwtService.verifyRefreshToken(refreshToken) as PublicUser;
@@ -103,11 +119,11 @@ export class AuthController {
     const hashedRefreshToken = await this.authService.hash(refreshToken, user.salt);
 
     if (!user.hashedRefreshToken) {
-      throw new HttpException('User signed out.', HttpStatus.BAD_REQUEST);
+      throw new BadRequestException('User signed out.');
     }
 
     if (user.hashedRefreshToken !== hashedRefreshToken) {
-      throw new HttpException('Refresh token reused.', HttpStatus.BAD_REQUEST);
+      throw new BadRequestException('Refresh token reused.');
     }
 
     const publicUser = this.userService.getPublicUser(user);
@@ -116,7 +132,7 @@ export class AuthController {
     await this.userService.updateUserByEmail(user.email, { hashedRefreshToken: newHashedRefreshToken });
 
     return {
-      statusCode: 200,
+      statusCode: HttpStatus.OK,
       data: {
         accessToken: jwtTokens.accessToken,
         refreshToken: jwtTokens.refreshToken,

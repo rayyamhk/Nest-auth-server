@@ -1,5 +1,5 @@
 import { sign, verify } from 'jsonwebtoken';
-import { HttpException, HttpStatus, Injectable } from '@nestjs/common';
+import { BadRequestException, ForbiddenException, Injectable } from '@nestjs/common';
 
 @Injectable()
 export class JWTService {
@@ -28,7 +28,7 @@ export class JWTService {
     try {
       return verify(token, process.env.JWT_ACCESS_TOKEN_KEY);
     } catch (err) {
-      throw new HttpException(err.message, HttpStatus.BAD_REQUEST);
+      throw new ForbiddenException(err.message);
     }
   }
 
@@ -36,7 +36,7 @@ export class JWTService {
     try {
       return verify(token, process.env.JWT_REFRESH_TOKEN_KEY);
     } catch (err) {
-      throw new HttpException(err.message, HttpStatus.BAD_REQUEST);
+      throw new BadRequestException(err.message);
     }
   }
 
