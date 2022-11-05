@@ -12,10 +12,10 @@ import { AuthGuard } from '../guards/auth.guard';
 @UseGuards(AuthGuard)
 export class AuthController {
   constructor(
-    private jwtService: JWTService,
-    private authService: AuthService,
-    private userService: UserService,
-  ) {}
+    private readonly jwtService: JWTService,
+    private readonly authService: AuthService,
+    private readonly userService: UserService,
+  ){}
 
   @Post('signup')
   async signUp(@Body(ValidateSignUpPipe) createUserDTO: CreateUserDTO) {

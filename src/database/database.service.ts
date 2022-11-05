@@ -6,60 +6,52 @@ import {
   UpdateItemCommand,
 } from '@aws-sdk/client-dynamodb';
 import { marshall, unmarshall } from '@aws-sdk/util-dynamodb';
-import { User } from '../user/interface/user';
 
 @Injectable()
-export class DatabaseService {
+export class DatabaseService<T> {
   private readonly ddbClient: DynamoDBClient;
-  private readonly USER_TABLE_NAME = 'Users';
   private readonly REGION = process.env.REGION || 'us-east-2';
 
-  constructor() {
+  constructor(private readonly tableName: string) {
     this.ddbClient = new DynamoDBClient({ region: this.REGION });
   }
 
-  async getUser(email: string) {
+  async get(key: Record<string, any>) {
     try {
-      const res = await this.ddbClient.send(
-        new GetItemCommand({
-          TableName: this.USER_TABLE_NAME,
-          Key: {
-            email: { S: email },
-          },
-        }),
-      );
+      const getItemInputKey = marshall(key);
+      const res = await this.ddbClient.send(new GetItemCommand({
+        TableName: this.tableName,
+        Key: getItemInputKey,
+      }));
       if (!res.Item) return null;
-      const data = unmarshall(res.Item) as User;
+      const data = unmarshall(res.Item) as T;
       return data;
     } catch (err) {
-      console.error('[Database Service] getUser: ', err);
+      console.error(`[Database Service] ${this.tableName} - get: `, err);
       throw err;
     }
   }
 
-  async createUser(user: User) {
+  async create(item: T) {
     try {
-      const item = marshall(user);
-      const res = await this.ddbClient.send(
-        new PutItemCommand({
-          TableName: this.USER_TABLE_NAME,
-          Item: item,
-        }),
-      );
+      const res = await this.ddbClient.send(new PutItemCommand({
+        TableName: this.tableName,
+        Item: marshall(item),
+      }));
       return res;
     } catch (err) {
-      console.error('[Database Service] createUser: ', err);
+      console.error(`[Database Service] ${this.tableName} - create: `, err);
       throw err;
     }
   }
 
-  async updateUser(email: string, updatedField: Partial<User>) {
+  async update(key: Record<string, any>, updatedFields: Partial<T>) {
     try {
-      const marshalled = marshall(updatedField);
+      const marshalled = marshall(updatedFields);
       const expressions = [];
       let i = 1;
       const ExpressionAttributeValues = {};
-      for (const key in updatedField) {
+      for (const key in updatedFields) {
         expressions.push(` ${key} = :v${i}`);
         ExpressionAttributeValues[`:v${i}`] = marshalled[key];
         i += 1;
@@ -67,10 +59,8 @@ export class DatabaseService {
       if (expressions.length !== 0) {
         await this.ddbClient.send(
           new UpdateItemCommand({
-            TableName: this.USER_TABLE_NAME,
-            Key: {
-              email: { S: email },
-            },
+            TableName: this.tableName,
+            Key: marshall(key),
             UpdateExpression: 'SET' + expressions.join(','),
             ExpressionAttributeValues,
             ReturnValues: 'NONE',
@@ -78,7 +68,7 @@ export class DatabaseService {
         );
       }
     } catch (err) {
-      console.error('[Database Service] updateUser: ', err);
+      console.error(`[Database Service] ${this.tableName} - update: `, err);
       throw err;
     }
   }

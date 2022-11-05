@@ -1,5 +1,5 @@
-import { ArgumentMetadata, HttpException, HttpStatus, Injectable, PipeTransform } from "@nestjs/common";
-import { AuthService } from "../auth.service";
+import { ArgumentMetadata, HttpException, HttpStatus, Injectable, PipeTransform } from '@nestjs/common';
+import { AuthService } from '../auth.service';
 
 @Injectable()
 export class ValidateSignInPipe implements PipeTransform {
