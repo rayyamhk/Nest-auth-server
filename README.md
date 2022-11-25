@@ -5,7 +5,7 @@ An authentication and authorization service powered by **NestJS** and **Amazon D
 #### Sign-up:
 
 ##### End-point
-POST /auth/signup
+POST /signup
 
 ##### Request Body
 | Field | Description |
@@ -17,24 +17,32 @@ POST /auth/signup
 | Code  | Description  |
 | ------------ | ------------ |
 | 201  | Created a new user successfully  |
-| 400  | Invalid email, invalid password, or email already exists  |
+| 400  | Invalid email and password  |
+| 409  | Email already existed  |
 | 500  | Server errors  |
 
 ##### Example
 ```
 curl
-	--request POST YOUR_URL/auth/signout'
-	--header 'Content-Type: application/x-www-form-urlencoded'
+	--request POST YOUR_URL/signout'
+	--header 'Content-Type: application/json'
 	--header 'X-API-KEY: YOUR_API_KEY'
-	--data-urlencode 'email=YOUR_EMAIL'
-	--data-urlencode 'password=YOUR_PASSWORD'
+	--data-raw '{
+		"email": YOUR_EMAIL,
+		"password": YOUR_PASSWORD
+	}'
 ```
 
 #### Sign-in
 Authenticate a user and return a pair of JWT access token and refresh token.
 
 ##### End-point
-POST /auth/signin
+POST /signin
+
+#### Request Header
+| Field | Description |
+| ------------ | ------------ |
+| x-agent-identifier | A key represents the sign-in device, used to support multi-device login |
 
 ##### Request Body
 | Field | Description |
@@ -46,50 +54,62 @@ POST /auth/signin
 | Code  | Description  |
 | ------------ | ------------ |
 | 200  | Authenticate successfully  |
-| 400  | Missing email or password |
 | 401  | Email doesn't exist, or incorrect password |
 | 500  | Server errors  |
 
 ##### Example
 ```
 curl
-	--request POST YOUR_URL/auth/signin'
-	--header 'Content-Type: application/x-www-form-urlencoded'
+	--request POST YOUR_URL/signin'
+	--header 'Content-Type: application/json'
 	--header 'X-API-KEY: YOUR_API_KEY'
-	--data-urlencode 'email=YOUR_EMAIL'
-	--data-urlencode 'password=YOUR_PASSWORD'
+	--header 'X-AGENT-IDENTIFIER: IDENTIFIER'
+	--data-raw '{
+		"email": YOUR_EMAIL,
+		"password": YOUR_PASSWORD
+	}'
 ```
 
 #### Sign-out
 
 ##### End-point
-POST /auth/signout
+POST /signout
 
 ##### Request Header
 | Field | Description |
 | ------------ | ------------ |
-| Authorization | Valid JWT Access Token |
+| x-agent-identifier | A key represents the sign-in device, used to support multi-device login |
+
+##### Request Body
+| Field | Description |
+| ------------ | ------------ |
+| refreshToken | The refresh token will be revoked in the database |
 
 ##### Response
 | Code  | Description  |
 | ------------ | ------------ |
 | 200  | Sign-out successfully  |
 | 400  | Missing request header, or invalid JWT access token |
+| 403  | Token expired, or token reused (refresh token rotation error) |
 | 500  | Server errors  |
 
 ##### Example
 ```
 curl
-	--request POST YOUR_URL/auth/signout'
-	--header 'Authorization: Bearer YOUR_JWT_TOKEN'
+	--request POST YOUR_URL/signout'
+	--header 'Content-Type: application/json'
+	--header 'X-AGENT-IDENTIFIER: IDENTIFIER'
 	--header 'X-API-KEY: YOUR_API_KEY'
+	--data-raw '{
+		refreshToken: YOUR_REFRESH_TOKEN
+	}'
 ```
 
 #### Authorize JWT Access Token
 Authorize a user, return an user object.
 
 ##### End-point
-POST /auth/authorize
+POST /authorize
 
 ##### Request Header
 | Field | Description |
@@ -106,33 +126,44 @@ POST /auth/authorize
 ##### Example
 ```
 curl
-	--request POST YOUR_URL/auth/authorize'
+	--request POST YOUR_URL/authorize'
 	--header 'Authorization: Bearer YOUR_JWT_TOKEN'
 	--header 'X-API-KEY: YOUR_API_KEY'
 ```
 
 #### Refresh JWT Access Token
-Refresh an access token by providing a valid refresh token. Return a pair of new access token and refresh token. The old refresh token becomes invalid (Refresh Token Rotation).
+Refresh an access token by providing a valid refresh token. Return a pair of new access token and refresh token, and the old refresh token will be revoked (Refresh Token Rotation).
 
 ##### End-point
-POST /auth/refresh
+POST /refresh
 
 ##### Request Header
 | Field | Description |
 | ------------ | ------------ |
-| Authorization | Valid JWT Refresh Token |
+| x-agent-identifier | A key represents the sign-in device, used to support multi-device login |
+
+##### Request Body
+| Field | Description |
+| ------------ | ------------ |
+| refreshToken | The refresh token will be revoked in the database |
 
 ##### Response
 | Code  | Description  |
 | ------------ | ------------ |
 | 200  | Refresh successfully  |
-| 400  | Missing request header, refresh token reused, or invalid refresh token |
+| 400  | Missing request header |
+| 403  | Invalid refresh token, or token reused |
+| 409  | User already signed out  |
 | 500  | Server errors  |
 
 ##### Example
 ```
 curl
-	--request POST YOUR_URL/auth/refresh'
-	--header 'Authorization: Bearer YOUR_JWT_TOKEN'
+	--request POST YOUR_URL/refresh'
+	--header 'Content-Type: application/json'
+	--header 'X-AGENT-IDENTIFIER: IDENTIFIER'
 	--header 'X-API-KEY: YOUR_API_KEY'
+	--data-raw '{
+		refreshToken: YOUR_REFRESH_TOKEN
+	}'
 ```
