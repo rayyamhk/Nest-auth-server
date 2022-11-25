@@ -1,10 +1,13 @@
 {
   "name": "auth-server",
   "version": "0.0.1",
-  "description": "Jwt-based auth server written in Nest.js",
+  "description": "Jwt-based auth server powered by NestJS",
   "author": "Ray Yam",
   "private": true,
   "license": "MIT",
+  "engines": {
+    "node": "^18"
+  },
   "scripts": {
     "prebuild": "rimraf dist",
     "build": "nest build",
@@ -23,6 +26,7 @@
   "dependencies": {
     "@aws-sdk/client-dynamodb": "^3.202.0",
     "@aws-sdk/util-dynamodb": "^3.202.0",
+    "@nestjs/cli": "^9.0.0",
     "@nestjs/common": "^9.0.0",
     "@nestjs/config": "^2.2.0",
     "@nestjs/core": "^9.0.0",
@@ -36,7 +40,6 @@
     "rxjs": "^7.2.0"
   },
   "devDependencies": {
-    "@nestjs/cli": "^9.0.0",
     "@nestjs/schematics": "^9.0.0",
     "@nestjs/testing": "^9.0.0",
     "@types/express": "^4.17.13",
