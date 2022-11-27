@@ -26,13 +26,12 @@ export class AllExceptionFilter implements ExceptionFilter {
       : ('Internal Server Error' as any);
 
     res.status(statusCode).json({
-      statusCode,
+      status: statusCode >= 500 ? 'error' : 'fail',
       message:
         typeof response === 'object' && response.message
           ? response.message
           : response,
-      time: new Date().toISOString(),
-      path: req.url,
+      data: null,
     });
   }
 }

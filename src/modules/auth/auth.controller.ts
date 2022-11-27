@@ -1,6 +1,7 @@
 import {
   Body,
   Controller,
+  DefaultValuePipe,
   HttpCode,
   HttpStatus,
   Post,
@@ -34,9 +35,10 @@ export class AuthController {
   async signIn(
     @Body('email') email: string,
     @Body('password') password: string,
+    @Body('keepSession', new DefaultValuePipe(false)) keepSession: boolean,
     @AgentIdentifier() identifier: string,
   ) {
-    const payload = await this.authService.signIn(email, password, identifier);
+    const payload = await this.authService.signIn(email, password, identifier, keepSession);
     return this.utilsService.formatResponse('User signed in.', payload);
   }
 
@@ -63,7 +65,7 @@ export class AuthController {
     @RefreshToken() refreshToken: string,
     @AgentIdentifier() identifier: string,
   ) {
-    const tokens = await this.authService.refresh(refreshToken, identifier);
-    return this.utilsService.formatResponse(null, tokens);
+    const payload = await this.authService.refresh(refreshToken, identifier);
+    return this.utilsService.formatResponse(null, payload);
   }
 }

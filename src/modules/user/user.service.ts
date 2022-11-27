@@ -14,7 +14,7 @@ export class UserService {
     return await this.usersDatabaseService.putItem(user);
   }
 
-  serialize(user: User): Partial<User> {
+  serialize(user: Partial<User>): Partial<User> {
     return {
       id: user.id,
       email: user.email,

@@ -43,7 +43,7 @@ export class AuthService {
     return this.userService.serialize(createdUser);
   }
 
-  async signIn(email: string, password: string, identifier: string) {
+  async signIn(email: string, password: string, identifier: string, keepSession: boolean) {
     if (!this.isValidEmail(email) || !this.isValidPassword(password))
       throw new UnauthorizedException('Incorrect email or password.');
     const existedUser = await this.userService.get(email);
@@ -56,15 +56,28 @@ export class AuthService {
     if (hashedPassword !== existedUser.hashedPassword)
       throw new UnauthorizedException('Incorrect email or password.');
     const payload = this.userService.serialize(existedUser);
-    const tokens = this.jwtService.generateTokens(payload);
-    await this.userService.put({
-      ...existedUser,
-      refreshTokens: {
-        ...existedUser.refreshTokens,
-        [identifier]: tokens.refreshToken,
-      },
-    });
-    return tokens;
+    const {
+      accessToken,
+      refreshToken,
+    } = this.jwtService.generateTokens(payload);
+    if (keepSession) {
+      await this.userService.put({
+        ...existedUser,
+        refreshTokens: {
+          ...existedUser.refreshTokens,
+          [identifier]: refreshToken,
+        },
+      });
+      return {
+        user: payload,
+        accessToken,
+        refreshToken,
+      }
+    }
+    return {
+      user: payload,
+      accessToken,
+    };
   }
 
   async signOut(refreshToken: string, identifier: string) {
@@ -97,7 +110,8 @@ export class AuthService {
   }
 
   async authorize(accessToken: string) {
-    return this.jwtService.verifyAccessToken(accessToken);
+    const payload = this.jwtService.verifyAccessToken(accessToken) as Partial<User>;
+    return this.userService.serialize(payload);
   }
 
   async refresh(refreshToken: string, identifier: string) {
@@ -114,9 +128,8 @@ export class AuthService {
       });
       throw new ForbiddenException('Refresh token reused.');
     }
-    const tokens = this.jwtService.generateTokens(
-      this.userService.serialize(user),
-    );
+    const _payload = this.userService.serialize(user);
+    const tokens = this.jwtService.generateTokens(_payload);
     await this.userService.put({
       ...user,
       refreshTokens: {
@@ -124,7 +137,11 @@ export class AuthService {
         [identifier]: tokens.refreshToken,
       },
     });
-    return tokens;
+    return {
+      user: _payload,
+      accessToken: tokens.accessToken,
+      refreshToken: tokens.refreshToken,
+    };
   }
 
   // https://en.wikipedia.org/wiki/Email_address#Syntax
