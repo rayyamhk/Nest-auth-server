@@ -1,12 +1,12 @@
 import { ValidationPipe } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
 import helmet from 'helmet';
+import * as cookieParser from 'cookie-parser';
 import { AppModule } from './app.module';
 import { AllExceptionFilter } from './filters/allException.filter';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
-  // Helmet is not required because it is a private server (authorized by x-api-key).
   app.use(helmet.hidePoweredBy());
   app.useGlobalFilters(new AllExceptionFilter());
   app.useGlobalPipes(
@@ -14,6 +14,12 @@ async function bootstrap() {
       whitelist: true, // remove unnecessary fields
     }),
   );
+  app.enableCors({
+    origin: process.env.CLIENT_ORIGIN || '*',
+    methods: 'POST', // only POST request allowed
+    credentials: true, // allows credentials (cookie) from clients
+  });
+  app.use(cookieParser());
   await app.listen(process.env.PORT || 8081);
 }
 bootstrap();

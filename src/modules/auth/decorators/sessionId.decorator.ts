@@ -3,12 +3,12 @@ import {
   ExecutionContext,
 } from '@nestjs/common';
 import { Request } from 'express';
-import { COOKIE_REFRESH_TOKEN } from '../../../constants';
+import { COOKIE_SESSION_ID } from 'src/constants';
 
-export const RefreshToken = createParamDecorator(
+export const SessionId = createParamDecorator(
   (data: unknown, ctx: ExecutionContext) => {
     const req = ctx.switchToHttp().getRequest<Request>();
-    const refreshToken = req.cookies[COOKIE_REFRESH_TOKEN] as string;
-    return refreshToken;
+    const sessionId = req.cookies[COOKIE_SESSION_ID];
+    return sessionId;
   },
 );

@@ -43,7 +43,7 @@ export class AuthService {
     return this.userService.serialize(createdUser);
   }
 
-  async signIn(email: string, password: string, identifier: string, keepSession: boolean) {
+  async signIn(email: string, password: string, keepSession: boolean) {
     if (!this.isValidEmail(email) || !this.isValidPassword(password))
       throw new UnauthorizedException('Incorrect email or password.');
     const existedUser = await this.userService.get(email);
@@ -61,18 +61,20 @@ export class AuthService {
       refreshToken,
     } = this.jwtService.generateTokens(payload);
     if (keepSession) {
+      const sessionId = randomUUID();
       await this.userService.put({
         ...existedUser,
         refreshTokens: {
           ...existedUser.refreshTokens,
-          [identifier]: refreshToken,
+          [sessionId]: refreshToken,
         },
       });
       return {
         user: payload,
         accessToken,
         refreshToken,
-      }
+        sessionId,
+      };
     }
     return {
       user: payload,
@@ -80,12 +82,12 @@ export class AuthService {
     };
   }
 
-  async signOut(refreshToken: string, identifier: string) {
+  async signOut(refreshToken: string, sessionId: string) {
     const payload = this.jwtService.verifyRefreshToken(
       refreshToken,
     ) as Partial<User>;
     const user = await this.userService.get(payload.email);
-    const revokedRefreshToken = user.refreshTokens[identifier];
+    const revokedRefreshToken = user.refreshTokens[sessionId];
 
     // already signed out
     if (!revokedRefreshToken) return;
@@ -100,7 +102,7 @@ export class AuthService {
     }
 
     // revoke the refresh token
-    delete user.refreshTokens[identifier];
+    delete user.refreshTokens[sessionId];
     await this.userService.put({
       ...user,
       refreshTokens: {
@@ -109,15 +111,31 @@ export class AuthService {
     });
   }
 
-  async authorize(accessToken: string) {
-    const payload = this.jwtService.verifyAccessToken(accessToken) as Partial<User>;
-    return this.userService.serialize(payload);
+  async authorize(accessToken: string, refreshToken: string, identifier: string): Promise<{
+    user: Partial<User>,
+    accessToken: string,
+    refreshToken?: string,
+  }> {
+    if (!accessToken) return await this.refresh(refreshToken, identifier);
+    try {
+      const payload = this.jwtService.verifyAccessToken(accessToken) as Partial<User>;
+      console.log(payload);
+      return {
+        user: this.userService.serialize(payload),
+        accessToken,
+      };
+    } catch (err) {
+      if (err.name !== 'TokenExpiredError') {
+        throw new ForbiddenException('Unauthorized.');
+      }
+      // access token expired, try the refresh token
+      return await this.refresh(refreshToken, identifier);
+    }
   }
 
-  async refresh(refreshToken: string, identifier: string) {
-    const payload = this.jwtService.verifyRefreshToken(
-      refreshToken,
-    ) as Partial<User>;
+  private async refresh(refreshToken: string, identifier: string) {
+    if (!refreshToken || !identifier) throw new ForbiddenException('Unauthorized.');
+    const payload = this.jwtService.verifyRefreshToken(refreshToken) as Partial<User>;
     const user = await this.userService.get(payload.email);
     const revokedRefreshToken = user.refreshTokens[identifier];
     if (!revokedRefreshToken) throw new ConflictException('User signed out.');
@@ -128,8 +146,8 @@ export class AuthService {
       });
       throw new ForbiddenException('Refresh token reused.');
     }
-    const _payload = this.userService.serialize(user);
-    const tokens = this.jwtService.generateTokens(_payload);
+    const serializedUser = this.userService.serialize(user);
+    const tokens = this.jwtService.generateTokens(serializedUser);
     await this.userService.put({
       ...user,
       refreshTokens: {
@@ -138,7 +156,7 @@ export class AuthService {
       },
     });
     return {
-      user: _payload,
+      user: serializedUser,
       accessToken: tokens.accessToken,
       refreshToken: tokens.refreshToken,
     };

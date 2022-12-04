@@ -33,6 +33,7 @@
     "@nestjs/platform-express": "^9.0.0",
     "@types/jsonwebtoken": "^8.5.9",
     "class-validator": "^0.13.2",
+    "cookie-parser": "^1.4.6",
     "helmet": "^6.0.0",
     "jsonwebtoken": "^8.5.1",
     "reflect-metadata": "^0.1.13",
@@ -42,6 +43,7 @@
   "devDependencies": {
     "@nestjs/schematics": "^9.0.0",
     "@nestjs/testing": "^9.0.0",
+    "@types/cookie-parser": "^1.4.3",
     "@types/express": "^4.17.13",
     "@types/jest": "28.1.8",
     "@types/node": "^16.0.0",
