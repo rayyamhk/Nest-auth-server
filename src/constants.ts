@@ -1,7 +1,7 @@
-// Database Name
-export const USER_TABLE = 'Users';
+// Mongo Collection Name
+export const USER_COLLECTION = 'users';
 
-export const TABLE_NAME = Symbol('TABLE_NAME');
+export const COLLECTION_NAME = Symbol('COLLECTION_NAME');
 
 // Regex
 export const EMAIL_REGEX =

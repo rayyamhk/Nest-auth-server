@@ -1,13 +1,13 @@
 type Role = 'user' | 'admin';
 
 export type User = {
-  id: string;
+  _id: string;
   email: string;
   hashedPassword: string;
   salt: string;
   role: Role;
   createdAt: string;
   refreshTokens: {
-    [identifier: string]: string;
+    [sessionId: string]: string;
   };
 };

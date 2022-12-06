@@ -1,39 +1,31 @@
 import { Inject, Injectable } from '@nestjs/common';
-import {
-  DynamoDBClient,
-  GetItemCommand,
-  PutItemCommand,
-} from '@aws-sdk/client-dynamodb';
-import { marshall, unmarshall } from '@aws-sdk/util-dynamodb';
-import { TABLE_NAME } from '../../constants';
+import { Collection, Document, MongoClient } from 'mongodb';
+import { COLLECTION_NAME } from '../../constants';
 
 @Injectable()
 export class DatabaseService<T> {
-  private readonly ddbClient: DynamoDBClient;
-  private readonly REGION = process.env.REGION || 'us-east-2';
+  private readonly collection: Collection<Document>;
+  private readonly MONGO_USERNAME = process.env.MONGO_USERNAME;
+  private readonly MONGO_PASSWORD = process.env.MONGO_PASSWORD;
+  private readonly MONGO_HOST = process.env.MONGO_HOST;
+  private readonly MONGO_DATABASE = process.env.MONGO_DATABASE;
 
-  constructor(@Inject(TABLE_NAME) private readonly tableName: string) {
-    this.ddbClient = new DynamoDBClient({ region: this.REGION });
+  constructor(
+    @Inject(COLLECTION_NAME) private readonly collectionName: string,
+  ) {
+    const uri = `mongodb://${this.MONGO_USERNAME}:${this.MONGO_PASSWORD}@${this.MONGO_HOST}?retryWrites=true&w=majority`;
+    this.collection = new MongoClient(uri).db(this.MONGO_DATABASE).collection(this.collectionName);
   }
 
-  async getItemByPrimaryKey(key: Record<string, any>) {
-    const res = await this.ddbClient.send(
-      new GetItemCommand({
-        TableName: this.tableName,
-        Key: marshall(key),
-      }),
-    );
-    if (!res.Item) return null;
-    const data = unmarshall(res.Item) as T;
-    return data;
+  async findOne(query: Partial<T>) {
+    return await this.collection.findOne<T>(query);
   }
 
-  async putItem(item: T) {
-    await this.ddbClient.send(
-      new PutItemCommand({
-        TableName: this.tableName,
-        Item: marshall(item),
-      }),
-    );
+  async insertOne(item: T) {
+    await this.collection.insertOne(item);
+  }
+
+  async replaceOne(item: T & {_id: string}) {
+    await this.collection.replaceOne({ _id: item._id }, item);
   }
 }

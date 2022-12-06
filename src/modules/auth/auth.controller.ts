@@ -43,9 +43,10 @@ export class AuthController {
     @Body('email') email: string,
     @Body('password') password: string,
     @Body('keepSession', new DefaultValuePipe(false)) keepSession: boolean,
+    @SessionId() sessionId: string,
     @Res({ passthrough: true }) res: Response,
   ) {
-    const payload = await this.authService.signIn(email, password, keepSession);
+    const payload = await this.authService.signIn(email, password, sessionId, keepSession);
     if (keepSession && payload.refreshToken && payload.sessionId) {
       res.cookie(COOKIE_REFRESH_TOKEN, payload.refreshToken, {
         ...this.COOKIE_OPTIONS,

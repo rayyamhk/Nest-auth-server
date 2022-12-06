@@ -7,16 +7,20 @@ export class UserService {
   constructor(private readonly usersDatabaseService: DatabaseService<User>) {}
 
   async get(email: string) {
-    return await this.usersDatabaseService.getItemByPrimaryKey({ email });
+    return await this.usersDatabaseService.findOne({ email });
   }
 
-  async put(user: User) {
-    return await this.usersDatabaseService.putItem(user);
+  async create(user: User) {
+    return await this.usersDatabaseService.insertOne(user);
+  }
+
+  async replace(user: User) {
+    return await this.usersDatabaseService.replaceOne(user);
   }
 
   serialize(user: Partial<User>): Partial<User> {
     return {
-      id: user.id,
+      _id: user._id,
       email: user.email,
       role: user.role,
       createdAt: user.createdAt,

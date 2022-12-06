@@ -31,7 +31,7 @@ export class AuthService {
     const salt = this.generateSalt();
     const hashedPassword = await this.utilsService.hash(password, salt);
     const createdUser: User = {
-      id: randomUUID(),
+      _id: randomUUID(),
       email,
       hashedPassword,
       salt,
@@ -39,11 +39,11 @@ export class AuthService {
       createdAt: now,
       refreshTokens: {},
     };
-    await this.userService.put(createdUser);
+    await this.userService.create(createdUser);
     return this.userService.serialize(createdUser);
   }
 
-  async signIn(email: string, password: string, keepSession: boolean) {
+  async signIn(email: string, password: string, sessionId: string, keepSession: boolean) {
     if (!this.isValidEmail(email) || !this.isValidPassword(password))
       throw new UnauthorizedException('Incorrect email or password.');
     const existedUser = await this.userService.get(email);
@@ -61,19 +61,19 @@ export class AuthService {
       refreshToken,
     } = this.jwtService.generateTokens(payload);
     if (keepSession) {
-      const sessionId = randomUUID();
-      await this.userService.put({
+      const _sessionId = sessionId || randomUUID();
+      await this.userService.replace({
         ...existedUser,
         refreshTokens: {
           ...existedUser.refreshTokens,
-          [sessionId]: refreshToken,
+          [_sessionId]: refreshToken,
         },
       });
       return {
         user: payload,
         accessToken,
         refreshToken,
-        sessionId,
+        sessionId: _sessionId,
       };
     }
     return {
@@ -94,7 +94,7 @@ export class AuthService {
 
     // refresh token reused
     if (revokedRefreshToken !== refreshToken) {
-      await this.userService.put({
+      await this.userService.replace({
         ...user,
         refreshTokens: {},
       });
@@ -103,7 +103,7 @@ export class AuthService {
 
     // revoke the refresh token
     delete user.refreshTokens[sessionId];
-    await this.userService.put({
+    await this.userService.replace({
       ...user,
       refreshTokens: {
         ...user.refreshTokens,
@@ -111,15 +111,14 @@ export class AuthService {
     });
   }
 
-  async authorize(accessToken: string, refreshToken: string, identifier: string): Promise<{
+  async authorize(accessToken: string, refreshToken: string, sessionId: string): Promise<{
     user: Partial<User>,
     accessToken: string,
     refreshToken?: string,
   }> {
-    if (!accessToken) return await this.refresh(refreshToken, identifier);
+    if (!accessToken) return await this.refresh(refreshToken, sessionId);
     try {
       const payload = this.jwtService.verifyAccessToken(accessToken) as Partial<User>;
-      console.log(payload);
       return {
         user: this.userService.serialize(payload),
         accessToken,
@@ -129,18 +128,18 @@ export class AuthService {
         throw new ForbiddenException('Unauthorized.');
       }
       // access token expired, try the refresh token
-      return await this.refresh(refreshToken, identifier);
+      return await this.refresh(refreshToken, sessionId);
     }
   }
 
-  private async refresh(refreshToken: string, identifier: string) {
-    if (!refreshToken || !identifier) throw new ForbiddenException('Unauthorized.');
+  private async refresh(refreshToken: string, sessionId: string) {
+    if (!refreshToken || !sessionId) throw new ForbiddenException('Unauthorized.');
     const payload = this.jwtService.verifyRefreshToken(refreshToken) as Partial<User>;
     const user = await this.userService.get(payload.email);
-    const revokedRefreshToken = user.refreshTokens[identifier];
+    const revokedRefreshToken = user.refreshTokens[sessionId];
     if (!revokedRefreshToken) throw new ConflictException('User signed out.');
     if (revokedRefreshToken !== refreshToken) {
-      await this.userService.put({
+      await this.userService.replace({
         ...user,
         refreshTokens: {},
       });
@@ -148,11 +147,11 @@ export class AuthService {
     }
     const serializedUser = this.userService.serialize(user);
     const tokens = this.jwtService.generateTokens(serializedUser);
-    await this.userService.put({
+    await this.userService.replace({
       ...user,
       refreshTokens: {
         ...user.refreshTokens,
-        [identifier]: tokens.refreshToken,
+        [sessionId]: tokens.refreshToken,
       },
     });
     return {
