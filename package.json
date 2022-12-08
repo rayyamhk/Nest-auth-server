@@ -29,6 +29,7 @@
     "@nestjs/config": "^2.2.0",
     "@nestjs/core": "^9.0.0",
     "@nestjs/platform-express": "^9.0.0",
+    "@nestjs/throttler": "^3.1.0",
     "@types/jsonwebtoken": "^8.5.9",
     "class-validator": "^0.13.2",
     "cookie-parser": "^1.4.6",
