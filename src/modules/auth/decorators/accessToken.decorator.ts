@@ -9,7 +9,10 @@ export const AccessToken = createParamDecorator(
   (data: unknown, ctx: ExecutionContext) => {
     const req = ctx.switchToHttp().getRequest<Request>();
     const accessToken = req.get('authorization');
-    if (!accessToken) return null;
+    if (!accessToken)
+      throw new BadRequestException(
+        'Access Token is missing in the request header.',
+      );
     const tokenParts = accessToken.split(' ');
     if (tokenParts.length !== 2 || tokenParts[0] !== 'Bearer')
       throw new BadRequestException('Invalid Bearer token.');

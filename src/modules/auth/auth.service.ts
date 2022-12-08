@@ -9,13 +9,16 @@ import { UserService } from '../user/user.service';
 import { UtilsService } from '../utils/utils.service';
 import { JWTService } from '../jwt/jwt.service';
 import { User } from '../user/types/User';
-import { CreateUserDTO } from './dto/user.dto';
+import { SignUpDTO } from './dto/user.dto';
 import { EMAIL_REGEX, STRONG_PASSWORD_REGEX } from '../../constants';
 
 @Injectable()
 export class AuthService {
   private readonly ENCODING = 'base64';
   private readonly SALT_BYTE = 16;
+  private readonly INCORRECT_CREDENTIALS_MESSAGE =
+    'Incorrect email or password.';
+  private readonly REFRESH_TOKEN_REUSED_MESSAGE = 'Refresh token reused.';
 
   constructor(
     private readonly userService: UserService,
@@ -23,7 +26,7 @@ export class AuthService {
     private readonly utilsService: UtilsService,
   ) {}
 
-  async signUp({ email, password }: CreateUserDTO) {
+  async signUp({ email, password }: SignUpDTO) {
     const existedUser = await this.userService.get(email);
     if (existedUser)
       throw new ConflictException(`User existed (email: ${email})`);
@@ -43,23 +46,26 @@ export class AuthService {
     return this.userService.serialize(createdUser);
   }
 
-  async signIn(email: string, password: string, sessionId: string, keepSession: boolean) {
+  async signIn(
+    email: string,
+    password: string,
+    sessionId: string,
+    keepSession: boolean,
+  ) {
     if (!this.isValidEmail(email) || !this.isValidPassword(password))
-      throw new UnauthorizedException('Incorrect email or password.');
+      throw new UnauthorizedException(this.INCORRECT_CREDENTIALS_MESSAGE);
     const existedUser = await this.userService.get(email);
     if (!existedUser)
-      throw new UnauthorizedException('Incorrect email or password.');
+      throw new UnauthorizedException(this.INCORRECT_CREDENTIALS_MESSAGE);
     const hashedPassword = await this.utilsService.hash(
       password,
       existedUser.salt,
     );
     if (hashedPassword !== existedUser.hashedPassword)
-      throw new UnauthorizedException('Incorrect email or password.');
+      throw new UnauthorizedException(this.INCORRECT_CREDENTIALS_MESSAGE);
     const payload = this.userService.serialize(existedUser);
-    const {
-      accessToken,
-      refreshToken,
-    } = this.jwtService.generateTokens(payload);
+    const { accessToken, refreshToken } =
+      this.jwtService.generateTokens(payload);
     if (keepSession) {
       const _sessionId = sessionId || randomUUID();
       await this.userService.replace({
@@ -98,7 +104,7 @@ export class AuthService {
         ...user,
         refreshTokens: {},
       });
-      throw new ForbiddenException('Refresh token reused.');
+      throw new ForbiddenException(this.REFRESH_TOKEN_REUSED_MESSAGE);
     }
 
     // revoke the refresh token
@@ -111,54 +117,56 @@ export class AuthService {
     });
   }
 
-  async authorize(accessToken: string, refreshToken: string, sessionId: string): Promise<{
-    user: Partial<User>,
+  async authorize(
     accessToken: string,
-    refreshToken?: string,
+    refreshToken: string,
+    sessionId: string,
+  ): Promise<{
+    user: Partial<User>;
+    accessToken: string;
+    refreshToken?: string;
   }> {
-    if (!accessToken) return await this.refresh(refreshToken, sessionId);
     try {
-      const payload = this.jwtService.verifyAccessToken(accessToken) as Partial<User>;
+      const payload = this.jwtService.verifyAccessToken(
+        accessToken,
+      ) as Partial<User>;
       return {
         user: this.userService.serialize(payload),
         accessToken,
       };
     } catch (err) {
-      if (err.name !== 'TokenExpiredError') {
+      if (err.name !== 'TokenExpiredError' || !refreshToken || !sessionId) {
         throw new ForbiddenException('Unauthorized.');
       }
       // access token expired, try the refresh token
-      return await this.refresh(refreshToken, sessionId);
-    }
-  }
-
-  private async refresh(refreshToken: string, sessionId: string) {
-    if (!refreshToken || !sessionId) throw new ForbiddenException('Unauthorized.');
-    const payload = this.jwtService.verifyRefreshToken(refreshToken) as Partial<User>;
-    const user = await this.userService.get(payload.email);
-    const revokedRefreshToken = user.refreshTokens[sessionId];
-    if (!revokedRefreshToken) throw new ConflictException('User signed out.');
-    if (revokedRefreshToken !== refreshToken) {
+      const payload = this.jwtService.verifyRefreshToken(
+        refreshToken,
+      ) as Partial<User>;
+      const user = await this.userService.get(payload.email);
+      const revokedRefreshToken = user.refreshTokens[sessionId];
+      if (!revokedRefreshToken) throw new ConflictException('User signed out.');
+      if (revokedRefreshToken !== refreshToken) {
+        await this.userService.replace({
+          ...user,
+          refreshTokens: {},
+        });
+        throw new ForbiddenException(this.REFRESH_TOKEN_REUSED_MESSAGE);
+      }
+      const serializedUser = this.userService.serialize(user);
+      const tokens = this.jwtService.generateTokens(serializedUser);
       await this.userService.replace({
         ...user,
-        refreshTokens: {},
+        refreshTokens: {
+          ...user.refreshTokens,
+          [sessionId]: tokens.refreshToken,
+        },
       });
-      throw new ForbiddenException('Refresh token reused.');
+      return {
+        user: serializedUser,
+        accessToken: tokens.accessToken,
+        refreshToken: tokens.refreshToken,
+      };
     }
-    const serializedUser = this.userService.serialize(user);
-    const tokens = this.jwtService.generateTokens(serializedUser);
-    await this.userService.replace({
-      ...user,
-      refreshTokens: {
-        ...user.refreshTokens,
-        [sessionId]: tokens.refreshToken,
-      },
-    });
-    return {
-      user: serializedUser,
-      accessToken: tokens.accessToken,
-      refreshToken: tokens.refreshToken,
-    };
   }
 
   // https://en.wikipedia.org/wiki/Email_address#Syntax

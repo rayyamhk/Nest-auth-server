@@ -7,7 +7,7 @@ export class UserService {
   constructor(private readonly usersDatabaseService: DatabaseService<User>) {}
 
   async get(email: string) {
-    return await this.usersDatabaseService.findOne({ email });
+    return await this.usersDatabaseService.findOneByEmail(email);
   }
 
   async create(user: User) {
@@ -15,7 +15,7 @@ export class UserService {
   }
 
   async replace(user: User) {
-    return await this.usersDatabaseService.replaceOne(user);
+    return await this.usersDatabaseService.replaceOneById(user._id, user);
   }
 
   serialize(user: Partial<User>): Partial<User> {

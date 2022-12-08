@@ -2,7 +2,6 @@ import { Response } from 'express';
 import {
   Body,
   Controller,
-  DefaultValuePipe,
   HttpCode,
   HttpStatus,
   Post,
@@ -13,8 +12,12 @@ import { UtilsService } from '../utils/utils.service';
 import { AccessToken } from './decorators/accessToken.decorator';
 import { RefreshToken } from './decorators/refreshToken.decorator';
 import { SessionId } from './decorators/sessionId.decorator';
-import { CreateUserDTO } from './dto/user.dto';
-import { COOKIE_SESSION_ID, COOKIE_REFRESH_TOKEN, JWT_REFRESH_TOKEN_EXP } from '../../constants';
+import { SignInDTO, SignUpDTO } from './dto/user.dto';
+import {
+  COOKIE_SESSION_ID,
+  COOKIE_REFRESH_TOKEN,
+  JWT_REFRESH_TOKEN_EXP,
+} from '../../constants';
 
 @Controller()
 export class AuthController {
@@ -32,7 +35,7 @@ export class AuthController {
 
   @Post('signup')
   @HttpCode(HttpStatus.CREATED)
-  async signUp(@Body() body: CreateUserDTO) {
+  async signUp(@Body() body: SignUpDTO) {
     const user = await this.authService.signUp(body);
     return this.utilsService.formatResponse(null, user);
   }
@@ -40,13 +43,16 @@ export class AuthController {
   @Post('signin')
   @HttpCode(HttpStatus.OK)
   async signIn(
-    @Body('email') email: string,
-    @Body('password') password: string,
-    @Body('keepSession', new DefaultValuePipe(false)) keepSession: boolean,
+    @Body() { email, password, keepSession }: SignInDTO,
     @SessionId() sessionId: string,
     @Res({ passthrough: true }) res: Response,
   ) {
-    const payload = await this.authService.signIn(email, password, sessionId, keepSession);
+    const payload = await this.authService.signIn(
+      email,
+      password,
+      sessionId,
+      keepSession,
+    );
     if (keepSession && payload.refreshToken && payload.sessionId) {
       res.cookie(COOKIE_REFRESH_TOKEN, payload.refreshToken, {
         ...this.COOKIE_OPTIONS,
@@ -86,9 +92,17 @@ export class AuthController {
     @SessionId() sessionId: string,
     @Res({ passthrough: true }) res: Response,
   ) {
-    const payload = await this.authService.authorize(accessToken, refreshToken, sessionId);
+    const payload = await this.authService.authorize(
+      accessToken,
+      refreshToken,
+      sessionId,
+    );
     if (payload.refreshToken) {
-      res.cookie(COOKIE_REFRESH_TOKEN, payload.refreshToken, this.COOKIE_OPTIONS);
+      res.cookie(
+        COOKIE_REFRESH_TOKEN,
+        payload.refreshToken,
+        this.COOKIE_OPTIONS,
+      );
     }
     return this.utilsService.formatResponse(null, {
       user: payload.user,
