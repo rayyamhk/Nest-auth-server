@@ -89,9 +89,12 @@ export class AuthService {
   }
 
   async signOut(refreshToken: string, sessionId: string) {
-    const payload = this.jwtService.verifyRefreshToken(
+    if (!refreshToken || !sessionId) return;
+    const payload = this.jwtService.verifyRefreshToken<Partial<User>>(
       refreshToken,
-    ) as Partial<User>;
+    );
+    if (payload === 'expired') throw new ForbiddenException('Expired refresh token.');
+    if (payload === 'invalid') throw new ForbiddenException('Invalid refresh token.');
     const user = await this.userService.get(payload.email);
     const revokedRefreshToken = user.refreshTokens[sessionId];
 
@@ -122,35 +125,45 @@ export class AuthService {
     refreshToken: string,
     sessionId: string,
   ): Promise<{
-    user: Partial<User>;
-    accessToken: string;
-    refreshToken?: string;
+    user: Partial<User>,
+    accessToken: string,
+    refreshToken?: string,
   }> {
-    try {
-      const payload = this.jwtService.verifyAccessToken(
-        accessToken,
-      ) as Partial<User>;
+    const accessTokenPayload = this.jwtService.verifyAccessToken<Partial<User>>(accessToken);
+    if (accessTokenPayload === 'invalid') {
+      console.error('Access token invalid');
+      return null;
+    }
+    if (accessTokenPayload !== 'expired') {
       return {
-        user: this.userService.serialize(payload),
+        user: this.userService.serialize(accessTokenPayload),
         accessToken,
       };
-    } catch (err) {
-      if (err.name !== 'TokenExpiredError' || !refreshToken || !sessionId) {
-        throw new ForbiddenException('Unauthorized.');
-      }
-      // access token expired, try the refresh token
-      const payload = this.jwtService.verifyRefreshToken(
-        refreshToken,
-      ) as Partial<User>;
-      const user = await this.userService.get(payload.email);
+    }
+    // access token expired, try the refresh token
+    if (!refreshToken || !sessionId) {
+      console.error('Missing refresh token and session Id');
+      return null;
+    }
+    const refreshTokenPayload = this.jwtService.verifyRefreshToken<Partial<User>>(refreshToken);
+    if (refreshTokenPayload === 'invalid') {
+      console.error('Refresh token invalid');
+      return null;
+    }
+    if (refreshTokenPayload !== 'expired') {
+      const user = await this.userService.get(refreshTokenPayload.email);
       const revokedRefreshToken = user.refreshTokens[sessionId];
-      if (!revokedRefreshToken) throw new ConflictException('User signed out.');
+      if (!revokedRefreshToken) {
+        console.error('Non-existed session Id');
+        return null;
+      }
       if (revokedRefreshToken !== refreshToken) {
         await this.userService.replace({
           ...user,
           refreshTokens: {},
         });
-        throw new ForbiddenException(this.REFRESH_TOKEN_REUSED_MESSAGE);
+        console.error('Refresh token reused.');
+        return null;
       }
       const serializedUser = this.userService.serialize(user);
       const tokens = this.jwtService.generateTokens(serializedUser);
@@ -167,6 +180,9 @@ export class AuthService {
         refreshToken: tokens.refreshToken,
       };
     }
+    // refresh token expired
+    console.error('Refresh token expired.');
+    return null;
   }
 
   // https://en.wikipedia.org/wiki/Email_address#Syntax

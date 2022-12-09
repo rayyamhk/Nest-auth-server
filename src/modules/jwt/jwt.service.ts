@@ -1,5 +1,5 @@
-import { ForbiddenException, Injectable } from '@nestjs/common';
-import { sign, verify } from 'jsonwebtoken';
+import { Injectable } from '@nestjs/common';
+import { JwtPayload, sign, verify } from 'jsonwebtoken';
 import { JWT_ACCESS_TOKEN_EXP, JWT_REFRESH_TOKEN_EXP } from '../../constants';
 
 @Injectable()
@@ -21,19 +21,21 @@ export class JWTService {
     };
   }
 
-  verifyAccessToken(token: string) {
+  verifyAccessToken<T = JwtPayload>(token: string): T | 'expired' | 'invalid' {
     try {
-      return verify(token, process.env.JWT_ACCESS_TOKEN_KEY);
+      return verify(token, process.env.JWT_ACCESS_TOKEN_KEY) as T;
     } catch (err) {
-      throw new ForbiddenException(err);
+      if (err.name === 'TokenExpiredError') return 'expired';
+      return 'invalid';
     }
   }
 
-  verifyRefreshToken(token: string) {
+  verifyRefreshToken<T = JwtPayload>(token: string): T | 'expired' | 'invalid' {
     try {
-      return verify(token, process.env.JWT_REFRESH_TOKEN_KEY);
+      return verify(token, process.env.JWT_REFRESH_TOKEN_KEY) as T;
     } catch (err) {
-      throw new ForbiddenException(err);
+      if (err.name === 'TokenExpiredError') return 'expired';
+      return 'invalid';
     }
   }
 }

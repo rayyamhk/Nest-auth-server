@@ -2,6 +2,7 @@ import { Response } from 'express';
 import {
   Body,
   Controller,
+  ForbiddenException,
   HttpCode,
   HttpStatus,
   Post,
@@ -73,14 +74,12 @@ export class AuthController {
     @SessionId() sessionId: string,
     @Res({ passthrough: true }) res: Response,
   ) {
-    if (refreshToken && sessionId) {
-      res.cookie(COOKIE_REFRESH_TOKEN, '', {
-        ...this.COOKIE_OPTIONS,
-        maxAge: 0,
-      });
-      res.cookie(COOKIE_SESSION_ID, '', this.COOKIE_OPTIONS);
-      await this.authService.signOut(refreshToken, sessionId);
-    }
+    res.cookie(COOKIE_REFRESH_TOKEN, '', {
+      ...this.COOKIE_OPTIONS,
+      maxAge: 0,
+    });
+    res.cookie(COOKIE_SESSION_ID, '', this.COOKIE_OPTIONS);
+    await this.authService.signOut(refreshToken, sessionId);
     return this.utilsService.formatResponse('Signed out.');
   }
 
@@ -97,6 +96,13 @@ export class AuthController {
       refreshToken,
       sessionId,
     );
+    if (!payload) {
+      res.cookie(COOKIE_REFRESH_TOKEN, '', {
+        ...this.COOKIE_OPTIONS,
+        maxAge: 0,
+      });
+      throw new ForbiddenException('Unauthorized');
+    }
     if (payload.refreshToken) {
       res.cookie(
         COOKIE_REFRESH_TOKEN,
